@@ -1,20 +1,58 @@
-## Android (Java) Demo App using InfluxDB for storing and quering sensor data
+# MotionSense Recorder
 
-This Android Java app is used to store sensor data from accelerometer and gyroscope of the smartphone in X, Y, Z axis at regular time intervals into an InfluxDB Serverless database bucket.
+Aplikasi Android (Java) untuk merekam data mentah **akselerometer + giroskop** (50 Hz) dan mengirimkannya ke **Supabase** (tabel `sensor_readings`) sebagai data privat untuk Big Project ML for IoT **MotionSense** (PCR 3 TRK A, Kelompok 1: Fahmi & Abid).
 
-1. [InfluxDB Java SDK](https://github.com/influxdata/influxdb-java)
-2. [MPAndroid Charts library for Data Visualization](https://github.com/PhilJay/MPAndroidChart)
+Repo pasangan (training + web): **https://github.com/fahmi0812/motionsense-har**
 
-<img src="https://github.com/InfluxCommunity/SensorLogger/blob/main/app/src/main/res/drawable/screenshot_main_activity.png" width="300">
-<img src="https://github.com/InfluxCommunity/SensorLogger/blob/main/app/src/main/res/drawable/screenshot_graph_activity.png" width="300">
+> Dibangun dari [InfluxCommunity/SensorLogger](https://github.com/InfluxCommunity/SensorLogger) (lisensi MIT, © penulis aslinya — lihat `LICENSE`). Kode upload InfluxDB dan grafik sudah diganti dengan perekaman + upload Supabase.
 
-### Build & Run
+## Fitur
+- Akselerometer (m/s², termasuk gravitasi) + giroskop (rad/s), `samplingPeriodUs = 20000` (50 Hz diminta). Satu baris per event akselerometer, dipasangkan dengan nilai giroskop terakhir.
+- `ts` = timestamp event sensor yang dikonversi ke waktu UTC, format ISO-8601 dengan mikrodetik (mis. `2026-11-03T05:01:02.123456Z`).
+- Input nama perekam (bebas, mis. `Fahmi`/`Abid` → kolom `user_id`) dan dropdown 6 aktivitas:
 
-1. Download/Clone this project
-2. Build the project using Android Studio or Android CLI and Run the app onto an Android smartphone (preferred) or emulator
-3. Tilt and rotate the phone up/down and left and right direction to capture sensor readings.
-5. Open Settings in the "Menu" and provide your InfluxDB account information that you can find in the [portal](https://cloud2.influxdata.com/login)
-6. Hit "Save" and "Start Logging" to log the data
-7. Open 'View Data' to see the graph visualization of the past few minutes of the data that was stored and quried from your InfluxDB.
-8. Optionally navigate to your InfluxDB [dashboard](https://cloud2.influxdata.com/login) and query to see the smartphone sensor data that was just stored.
+  | Tampilan | Label yang disimpan (sama dengan `common.py` & CHECK di Supabase) |
+  |---|---|
+  | berjalan | `WALKING` |
+  | naik_tangga | `WALKING_UPSTAIRS` |
+  | turun_tangga | `WALKING_DOWNSTAIRS` |
+  | duduk | `SITTING` |
+  | berdiri | `STANDING` |
+  | berbaring | `LAYING` |
 
+- Tiap START = `session_id` baru (UUID murni, karena kolom Supabase bertipe `uuid`).
+- Foreground service + wake lock → tetap merekam saat layar mati.
+- Buffer lokal SQLite; tiap 2 detik dikirim batch 100 baris ke `POST /rest/v1/sensor_readings` (header `apikey`, `Authorization: Bearer`, `Prefer: return=minimal,resolution=ignore-duplicates`, `on_conflict=session_id,ts`). Gagal → data tetap di HP dan dicoba ulang (tombol **Kirim ulang sekarang** juga ada). Data lokal tidak pernah dihapus otomatis.
+- Ekspor sesi ke CSV (`Download/MotionSense/` + share intent) dengan header `session_id,ts,ax,ay,az,gx,gy,gz,label,user_id` — langsung bisa dibaca `training/02_siapkan_privat.py --csv`.
+
+## Mengatur Supabase URL & anon key
+Kredensial **tidak** di-hardcode. Pilih salah satu:
+1. **Saat build:** salin `local.properties.example` → `local.properties` (sudah di `.gitignore`), isi:
+   ```
+   SUPABASE_URL=https://xxxx.supabase.co
+   SUPABASE_ANON_KEY=eyJ...   # anon public key, BUKAN service_role
+   ```
+2. **Di aplikasi:** menu ⋮ → **Pengaturan Supabase** → isi URL dan anon key → Simpan (menimpa nilai dari build).
+
+Tabel & RLS: ikuti `docs/SETUP-Supabase.md` di repo motionsense-har (anon hanya boleh INSERT dengan `sumber='privat'`; aplikasi mengirim `sumber='privat'` dan `sampling_rate=50`).
+
+## Build APK
+**Android Studio:** File → Open → folder repo ini → tunggu Gradle sync → Build → Build APK(s). APK: `app/build/outputs/apk/debug/app-debug.apk`.
+
+**Command line** (JDK 17 + Android SDK 34):
+```bash
+cp local.properties.example local.properties   # isi sdk.dir + kredensial
+./gradlew assembleDebug
+```
+
+## Cara merekam (sesuai README motionsense-har)
+1. Isi nama perekam, pilih aktivitas, tekan **START**.
+2. Masukkan HP ke **saku/klip di pinggang** (posisi & orientasi sama setiap sesi).
+3. Lakukan aktivitas **±2 menit per aktivitas per orang** (Fahmi dan Abid masing-masing 6 aktivitas).
+4. Ambil HP, tekan **STOP**. Periksa "Antre (belum terkirim)" turun ke 0; bila tidak ada internet, data tetap aman dan dikirim nanti.
+5. Cadangan: **Ekspor sesi ke CSV**.
+
+Catatan: Hz aktual tergantung HP (beberapa HP memberi sedikit di atas/bawah 50 Hz) — training melakukan resample ke 50 Hz.
+
+## Lisensi
+MIT — lihat `LICENSE` (hak cipta upstream tetap dipertahankan).

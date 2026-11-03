@@ -2,19 +2,26 @@ plugins {
   alias(libs.plugins.android.application)
 }
 
+// Kredensial Supabase dibaca dari local.properties (TIDAK di-commit) atau -P gradle property / env.
+def localProps = new Properties()
+def lp = rootProject.file('local.properties')
+if (lp.exists()) lp.withInputStream { localProps.load(it) }
+def cfg = { String k -> (localProps.getProperty(k) ?: project.findProperty(k) ?: System.getenv(k) ?: '').toString() }
+
 android {
-  namespace 'com.influxdata.demo'
+  namespace 'id.ac.pcr.motionsense.recorder'
   compileSdk 34
 
   defaultConfig {
-    applicationId "com.influxdata.demo"
+    applicationId "id.ac.pcr.motionsense.recorder"
     minSdk 26
     targetSdk 34
     versionCode 1
-    versionName "1.0"
-
-    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    versionName "0.1.0"
+    buildConfigField "String", "SUPABASE_URL", "\"${cfg('SUPABASE_URL')}\""
+    buildConfigField "String", "SUPABASE_ANON_KEY", "\"${cfg('SUPABASE_ANON_KEY')}\""
   }
+  buildFeatures { buildConfig true }
 
   buildTypes {
     release {
@@ -29,15 +36,8 @@ android {
 }
 
 dependencies {
-
   implementation libs.appcompat
   implementation libs.material
   implementation libs.activity
   implementation libs.constraintlayout
-  testImplementation libs.junit
-  androidTestImplementation libs.ext.junit
-  androidTestImplementation libs.espresso.core
-
-  implementation 'com.influxdb:influxdb-client-java:6.10.0'
-  implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
 }

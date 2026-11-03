@@ -1,0 +1,4 @@
+# Salin menjadi local.properties (file itu di-.gitignore, JANGAN di-commit)
+sdk.dir=/path/ke/Android/Sdk
+SUPABASE_URL=https://xxxxxxxx.supabase.co
+SUPABASE_ANON_KEY=isi_anon_public_key_di_sini
